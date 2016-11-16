@@ -3,19 +3,21 @@ package main
 import (
 	"fmt"
 
+	"github.com/pkg/errors"
+
 	"golang.org/x/crypto/ssh"
 )
 
-type Server struct {
+type Relay struct {
 	Host    string
 	Port    string
 	Config  *ssh.ClientConfig
 	Client  *ssh.Client
 	Tunnels []*SSHtunnel
-	Running bool
+	Active  bool
 }
 
-func (s *Server) Connect() (err error) {
+func (s *Relay) connect() (err error) {
 	if len(s.Port) == 0 {
 		s.Port = fmt.Sprintf("%d", s.Port)
 	}
@@ -25,7 +27,10 @@ func (s *Server) Connect() (err error) {
 	return err
 }
 
-func (s *Server) AddTunnel(localPort, remoteHost, remotePort string) error {
+func (s *Relay) AddTunnel(localPort, remoteHost, remotePort string) error {
+	if s.Active {
+		return fmt.Errorf("Cannot add tunel to active relay")
+	}
 	s.Tunnels = append(s.Tunnels, &SSHtunnel{
 		&Endpoint{
 			"localhost",
@@ -37,12 +42,16 @@ func (s *Server) AddTunnel(localPort, remoteHost, remotePort string) error {
 		},
 		false,
 	})
-
 	return nil
 }
 
-func (s *Server) StartAllTunnels() {
+func (s *Relay) Activate() error {
+	if err := s.connect(); err != nil {
+		return errors.Wrap(err, "Cannot estabilish ssh connection")
+	}
 	for _, tunnel := range s.Tunnels {
 		go tunnel.Start(s.Client)
 	}
+	s.Active = true
+	return nil
 }

@@ -56,4 +56,5 @@ func (t *SSHtunnel) forward(localConn net.Conn, client *ssh.Client) {
 
 	go copyConn(localConn, remoteConn)
 	go copyConn(remoteConn, localConn)
+	t.Active = true
 }

@@ -19,19 +19,25 @@ func main() {
 		},
 	}
 
-	s := &Server{
-		Host:   "192.168.0.104",
+	s := &Relay{
+		Host:   "192.168.0.100",
 		Port:   "22",
 		Config: cfg,
 	}
 
 	s.AddTunnel("7777", "seznam.cz", "80")
+	s.AddTunnel("8888", "google.com", "80")
 
 	fmt.Println("Trying to connect")
-	if err := s.Connect(); err != nil {
+	if err := s.Activate(); err != nil {
 		log.Panic("Cannot connect to SSH" + err.Error())
 	}
-	s.StartAllTunnels()
+
+	for _, tunnel := range s.Tunnels {
+		if tunnel.Active {
+			fmt.Printf("%s -> %s\n", tunnel.Local.Port, tunnel.Remote.String())
+		}
+	}
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
