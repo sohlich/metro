@@ -51,6 +51,7 @@ func (s *Relay) Activate() error {
 	}
 	for _, tunnel := range s.Tunnels {
 		go tunnel.Start(s.Client)
+		tunnel.Active = true
 	}
 	s.Active = true
 	return nil

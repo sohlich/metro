@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"net"
 
 	"golang.org/x/crypto/ssh"
@@ -37,24 +38,25 @@ func (t *SSHtunnel) Start(client *ssh.Client) error {
 			return err
 		}
 		go t.forward(conn, client)
+
 	}
 }
 
 func (t *SSHtunnel) forward(localConn net.Conn, client *ssh.Client) {
 	remoteConn, err := client.Dial("tcp", t.Remote.String())
 	if err != nil {
-		fmt.Printf("Remote dial error: %s\n", err)
+		log.Printf("Remote dial error: %s\n", err)
 		return
 	}
 
 	copyConn := func(writer, reader net.Conn) {
 		_, err := io.Copy(writer, reader)
 		if err != nil {
-			fmt.Printf("io.Copy error: %s", err)
+			log.Printf("io.Copy error: %s", err)
 		}
 	}
 
 	go copyConn(localConn, remoteConn)
 	go copyConn(remoteConn, localConn)
-	t.Active = true
+
 }
