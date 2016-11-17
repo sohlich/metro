@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/pkg/errors"
 
@@ -64,7 +65,7 @@ func (s *Relay) Activate() error {
 func (s *Relay) PrintTunels() {
 	for _, tunnel := range s.Tunnels {
 		if tunnel.Active {
-			fmt.Printf("%s -> %s\n", tunnel.Local.Port, tunnel.Remote.String())
+			log.Printf("%s -> %s\n", tunnel.Local.Port, tunnel.Remote.String())
 		}
 	}
 }

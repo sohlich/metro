@@ -62,8 +62,6 @@ func main() {
 	tunelList := flag.String("list", "", "CSV list of tunnels")
 	flag.Parse()
 
-	// Validate input
-
 	cfg := &ssh.ClientConfig{
 		User: *sshUser,
 		Auth: []ssh.AuthMethod{
@@ -79,7 +77,7 @@ func main() {
 
 	loadTunnelsFromFile(s, *tunelList)
 
-	fmt.Println("Connecting to ssh endpoint ...")
+	log.Println("Connecting to ssh endpoint ...")
 	if err := s.Activate(); err != nil {
 		log.Panic("Cannot connect to SSH" + err.Error())
 	}
@@ -88,9 +86,9 @@ func main() {
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
-	fmt.Println("Press Ctrl+C to close.")
+	log.Println("Press Ctrl+C to close.")
 	<-signalChan
-	fmt.Println("Bye bye")
+	log.Println("Bye bye")
 
 }
 
@@ -112,9 +110,10 @@ func loadTunnels(s *Relay, tunels io.Reader) {
 		tunnel := scanner.Text()
 		cfgTunnel := strings.Split(tunnel, ";")
 		if err := s.AddTunnel(cfgTunnel[0], cfgTunnel[1]); err != nil {
-			fmt.Printf("Cannot add tunnel: %s reason: %s\n", tunnel, err.Error())
+			log.Printf("Cannot add tunnel: %s reason: %s\n", tunnel, err.Error())
+		} else {
+			count++
 		}
-		count++
 	}
 	log.Printf("Loaded %d tunnels\n", count)
 }
