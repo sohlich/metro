@@ -14,6 +14,8 @@ import (
 
 	"strings"
 
+	"io"
+
 	"golang.org/x/crypto/ssh"
 )
 
@@ -75,30 +77,14 @@ func main() {
 		Config: cfg,
 	}
 
-	log.Println(*tunelList)
+	loadTunnelsFromFile(s, *tunelList)
 
-	f, err := os.Open(*tunelList)
-	if err != nil {
-		log.Fatalln("Cannot read config file")
-	}
-
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		tunnel := scanner.Text()
-		cfgTunnel := strings.Split(tunnel, ";")
-		s.AddTunnel(cfgTunnel[0], cfgTunnel[1])
-	}
-
-	fmt.Println("Trying to connect")
+	fmt.Println("Connecting to ssh endpoint ...")
 	if err := s.Activate(); err != nil {
 		log.Panic("Cannot connect to SSH" + err.Error())
 	}
 
-	for _, tunnel := range s.Tunnels {
-		if tunnel.Active {
-			fmt.Printf("%s -> %s\n", tunnel.Local.Port, tunnel.Remote.String())
-		}
-	}
+	s.PrintTunels()
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
@@ -106,4 +92,29 @@ func main() {
 	<-signalChan
 	fmt.Println("Bye bye")
 
+}
+
+func loadTunnelsFromFile(s *Relay, filepath string) {
+	fmt.Printf("Reading tunel file: %s\n", filepath)
+	f, err := os.Open(filepath)
+	if err != nil {
+		log.Fatalln("Cannot read config file")
+	}
+	defer f.Close()
+	loadTunnels(s, f)
+}
+
+func loadTunnels(s *Relay, tunels io.Reader) {
+	log.Printf("Loading tunnels...")
+	count := 0
+	scanner := bufio.NewScanner(tunels)
+	for scanner.Scan() {
+		tunnel := scanner.Text()
+		cfgTunnel := strings.Split(tunnel, ";")
+		if err := s.AddTunnel(cfgTunnel[0], cfgTunnel[1]); err != nil {
+			fmt.Printf("Cannot add tunnel: %s reason: %s\n", tunnel, err.Error())
+		}
+		count++
+	}
+	log.Printf("Loaded %d tunnels\n", count)
 }

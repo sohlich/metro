@@ -60,3 +60,11 @@ func (s *Relay) Activate() error {
 	s.Active = true
 	return nil
 }
+
+func (s *Relay) PrintTunels() {
+	for _, tunnel := range s.Tunnels {
+		if tunnel.Active {
+			fmt.Printf("%s -> %s\n", tunnel.Local.Port, tunnel.Remote.String())
+		}
+	}
+}
