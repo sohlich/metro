@@ -1,20 +1,15 @@
 package main
 
 import (
+	"bufio"
+	"flag"
+	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/signal"
-	"syscall"
-
-	"fmt"
-
-	"flag"
-
-	"bufio"
-
 	"strings"
-
-	"io"
+	"syscall"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -31,6 +26,9 @@ type InputConfig struct {
 	PKFile    string
 }
 
+// Validate validates config struct
+// if any of missiong arguments
+// error is returned
 func (cfg *InputConfig) Validate() error {
 
 	if isEmpty(cfg.Host) && isEmpty(cfg.Port) {
@@ -60,7 +58,10 @@ func main() {
 	sshUser := flag.String("user", "", "User for SSH")
 	sshPass := flag.String("password", "", "Password for SSH")
 	tunelList := flag.String("list", "", "CSV list of tunnels")
+
 	flag.Parse()
+
+	log.Println(os.Args)
 
 	cfg := &ssh.ClientConfig{
 		User: *sshUser,
@@ -82,7 +83,7 @@ func main() {
 		log.Panic("Cannot connect to SSH" + err.Error())
 	}
 
-	s.PrintTunels()
+	s.PrintActiveTunels()
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)

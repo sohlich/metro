@@ -50,7 +50,6 @@ func (t *SSHtunnel) Start(client *ssh.Client) error {
 			return err
 		}
 		go t.forward(conn, client)
-
 	}
 }
 
