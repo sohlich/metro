@@ -27,19 +27,23 @@ func (s *Relay) connect() (err error) {
 	return err
 }
 
-func (s *Relay) AddTunnel(localPort, remoteHost, remotePort string) error {
+func (s *Relay) AddTunnel(localPort, remoteHostPort string) error {
 	if s.Active {
 		return fmt.Errorf("Cannot add tunel to active relay")
 	}
+
+	// Split host port
+	remote, err := EndpointFromHostPort(remoteHostPort)
+	if err != nil {
+		return err
+	}
+
 	s.Tunnels = append(s.Tunnels, &SSHtunnel{
 		&Endpoint{
 			"localhost",
 			localPort,
 		},
-		&Endpoint{
-			remoteHost,
-			remotePort,
-		},
+		remote,
 		false,
 	})
 	return nil

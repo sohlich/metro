@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"strings"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -16,6 +17,17 @@ type Endpoint struct {
 
 func (endpoint *Endpoint) String() string {
 	return fmt.Sprintf("%s:%s", endpoint.Host, endpoint.Port)
+}
+
+func EndpointFromHostPort(hostPort string) (*Endpoint, error) {
+	remote := strings.Split(hostPort, ":")
+	if len(remote) < 2 {
+		return nil, fmt.Errorf("Tunnel does not contain a port")
+	}
+	return &Endpoint{
+		remote[0],
+		remote[1],
+	}, nil
 }
 
 type SSHtunnel struct {

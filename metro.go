@@ -86,7 +86,7 @@ func main() {
 	for scanner.Scan() {
 		tunnel := scanner.Text()
 		cfgTunnel := strings.Split(tunnel, ";")
-		s.AddTunnel(cfgTunnel[0], cfgTunnel[1], cfgTunnel[2])
+		s.AddTunnel(cfgTunnel[0], cfgTunnel[1])
 	}
 
 	fmt.Println("Trying to connect")
