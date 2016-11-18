@@ -11,6 +11,8 @@ import (
 	"strings"
 	"syscall"
 
+	"time"
+
 	"golang.org/x/crypto/ssh"
 )
 
@@ -76,6 +78,7 @@ func main() {
 		Auth: []ssh.AuthMethod{
 			ssh.Password(config.Password),
 		},
+		Timeout: 20 * time.Second,
 	}
 
 	s := &Relay{
@@ -88,7 +91,8 @@ func main() {
 
 	log.Println("Connecting to ssh endpoint ...")
 	if err := s.Activate(); err != nil {
-		log.Panic("Cannot connect to SSH" + err.Error())
+		log.Println("Cannot connect to SSH : \n" + err.Error())
+		return
 	}
 
 	s.PrintActiveTunels()
