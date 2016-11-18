@@ -20,12 +20,13 @@ import (
 // verify arguments passed
 // to application.
 type InputConfig struct {
-	Host      string
-	Port      string
-	User      string
-	Password  string
-	TunelList string
-	PKFile    string
+	Host       string
+	Port       string
+	User       string
+	Password   string
+	TunelList  string
+	PKFile     string
+	SSHTimeout int
 }
 
 // Validate validates config struct
@@ -58,6 +59,7 @@ func parseConfig() *InputConfig {
 	cfg := &InputConfig{}
 	flag.StringVar(&cfg.Host, "host", "", "Host for SSH")
 	flag.StringVar(&cfg.Port, "port", "22", "Port for SSH")
+	flag.IntVar(&cfg.SSHTimeout, "timeout", 20, "Port for SSH")
 	flag.StringVar(&cfg.User, "user", "", "User for SSH")
 	flag.StringVar(&cfg.Password, "password", "", "Password for SSH")
 	flag.StringVar(&cfg.TunelList, "list", "", "CSV list of tunnels")
@@ -78,7 +80,7 @@ func main() {
 		Auth: []ssh.AuthMethod{
 			ssh.Password(config.Password),
 		},
-		Timeout: 20 * time.Second,
+		Timeout: time.Duration(config.SSHTimeout) * time.Second,
 	}
 
 	s := &Relay{
