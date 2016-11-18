@@ -50,33 +50,41 @@ func isEmpty(str string) bool {
 	return len(str) == 0
 }
 
+var config *InputConfig
+
+func parseConfig() *InputConfig {
+	cfg := &InputConfig{}
+	flag.StringVar(&cfg.Host, "host", "", "Host for SSH")
+	flag.StringVar(&cfg.Port, "port", "22", "Port for SSH")
+	flag.StringVar(&cfg.User, "user", "", "User for SSH")
+	flag.StringVar(&cfg.Password, "password", "", "Password for SSH")
+	flag.StringVar(&cfg.TunelList, "list", "", "CSV list of tunnels")
+	flag.Parse()
+	return cfg
+}
+
 func main() {
 
+	config = parseConfig()
+	if err := config.Validate(); err != nil {
+		log.Fatal(err.Error())
+	}
 	// Read args from cmd
-	sshHost := flag.String("host", "", "Host for SSH")
-	sshPort := flag.String("port", "22", "Port for SSH")
-	sshUser := flag.String("user", "", "User for SSH")
-	sshPass := flag.String("password", "", "Password for SSH")
-	tunelList := flag.String("list", "", "CSV list of tunnels")
-
-	flag.Parse()
-
-	log.Println(os.Args)
 
 	cfg := &ssh.ClientConfig{
-		User: *sshUser,
+		User: config.User,
 		Auth: []ssh.AuthMethod{
-			ssh.Password(*sshPass),
+			ssh.Password(config.Password),
 		},
 	}
 
 	s := &Relay{
-		Host:   *sshHost,
-		Port:   *sshPort,
+		Host:   config.Host,
+		Port:   config.Port,
 		Config: cfg,
 	}
 
-	loadTunnelsFromFile(s, *tunelList)
+	loadTunnelsFromFile(s, config.TunelList)
 
 	log.Println("Connecting to ssh endpoint ...")
 	if err := s.Activate(); err != nil {
