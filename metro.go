@@ -90,6 +90,7 @@ func main() {
 		Port:   config.Port,
 		Config: cfg,
 		Wait:   &sync.WaitGroup{},
+		Active: NewAtomicBool(),
 	}
 
 	loadTunnelsFromFile(s, config.TunelList)

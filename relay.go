@@ -10,6 +10,12 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+const (
+	// DefaultPort is common
+	// used  SSH port
+	DefaultPort = 22
+)
+
 // Relay represents ssh connection
 // which provides the tuneling
 type Relay struct {
@@ -18,7 +24,7 @@ type Relay struct {
 	Config  *ssh.ClientConfig
 	Client  *ssh.Client
 	Tunnels []*SSHtunnel
-	Active  bool
+	Active  *AtomicBool
 	Wait    *sync.WaitGroup
 }
 
@@ -28,7 +34,7 @@ type Relay struct {
 // all tunnels, which are sucessfuly activated
 // provide relay to given destination.
 func (s *Relay) AddTunnel(localPort, remoteHostPort string) error {
-	if s.Active {
+	if s.Active.Get() {
 		return fmt.Errorf("Cannot add tunel to active relay")
 	}
 
@@ -44,24 +50,26 @@ func (s *Relay) AddTunnel(localPort, remoteHostPort string) error {
 			localPort,
 		},
 		Remote:   remote,
-		Active:   false,
+		Active:   NewAtomicBool(),
 		stopChan: make(chan bool),
 	})
 	return nil
 }
 
-// PrintTunels prints
+// PrintActiveTunels prints
 // all active tunnels
 func (s *Relay) PrintActiveTunels() {
 	for _, tunnel := range s.Tunnels {
-		if tunnel.Active {
+		if tunnel.Active.Get() {
 			log.Printf("%s -> %s\n", tunnel.Local.Port, tunnel.Remote.String())
 		}
 	}
 }
 
+// Activate connects the SSH connection and
+// activates all tunnels from SSHtunnel list.
 func (s *Relay) Activate() error {
-	if s.Active {
+	if s.Active.Get() {
 		return fmt.Errorf("Relay already activated")
 	}
 	if err := s.connect(); err != nil {
@@ -69,27 +77,26 @@ func (s *Relay) Activate() error {
 	}
 	for _, tunnel := range s.Tunnels {
 		go tunnel.Start(s.Client, s.Wait)
-		tunnel.Active = true
 	}
-	s.Active = true
+	s.Active.Set(true)
 	return nil
 }
 
+// Stop disables all active tunnels
+// and closes the ssh connection
 func (s *Relay) Stop() {
 	for _, tun := range s.Tunnels {
-		if tun.Active {
-			log.Println("Stop signal is being sent")
-			tun.Stop()
-		}
+		tun.Stop()
 	}
 
 	log.Println("Waiting to stop relay")
 	s.Wait.Wait()
+	s.Client.Close()
 }
 
 func (s *Relay) connect() (err error) {
 	if len(s.Port) == 0 {
-		s.Port = fmt.Sprintf("%d", s.Port)
+		s.Port = fmt.Sprintf("%d", DefaultPort)
 	}
 
 	hostPort := fmt.Sprintf("%s:%s", s.Host, s.Port)

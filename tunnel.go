@@ -11,6 +11,8 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+// Endpoint is wrapping
+// the host and port of SSHtunnel endpoint
 type Endpoint struct {
 	Host string
 	Port string
@@ -20,6 +22,8 @@ func (endpoint *Endpoint) String() string {
 	return fmt.Sprintf("%s:%s", endpoint.Host, endpoint.Port)
 }
 
+// EndpointFromHostPort is  helper function
+// for creating endpoint from string in format "<host>:<port>"
 func EndpointFromHostPort(hostPort string) (*Endpoint, error) {
 	remote := strings.Split(hostPort, ":")
 	if len(remote) < 2 {
@@ -31,10 +35,11 @@ func EndpointFromHostPort(hostPort string) (*Endpoint, error) {
 	}, nil
 }
 
+//
 type SSHtunnel struct {
 	Local    *Endpoint
 	Remote   *Endpoint
-	Active   bool
+	Active   *AtomicBool
 	stopChan chan bool
 	listener net.Listener
 }
@@ -56,7 +61,7 @@ func (t *SSHtunnel) Start(client *ssh.Client, wait *sync.WaitGroup) error {
 			log.Println("Listener closed ")
 			return err
 		}
-		t.Active = true
+		t.Active.Set(true)
 		go t.forward(conn, client)
 	}
 }
@@ -95,7 +100,7 @@ func copyConnection(conn1 net.Conn, conn2 net.Conn, stopChan chan bool) {
 
 func (t *SSHtunnel) Stop() {
 	t.listener.Close()
-	if t.Active {
+	if t.Active.Get() {
 		close(t.stopChan)
 	}
 }
