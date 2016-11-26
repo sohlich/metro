@@ -8,6 +8,7 @@ import (
 
 	"sync"
 
+	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -35,7 +36,8 @@ func EndpointFromHostPort(hostPort string) (*Endpoint, error) {
 	}, nil
 }
 
-//
+// SSHtunnel represents the
+// tunneled connection via ssh
 type SSHtunnel struct {
 	Local    *Endpoint
 	Remote   *Endpoint
@@ -44,7 +46,13 @@ type SSHtunnel struct {
 	listener net.Listener
 }
 
+// Start opens(activates) the
+// SSHtunnel tunnel
 func (t *SSHtunnel) Start(client *ssh.Client, wait *sync.WaitGroup) error {
+	if client == nil {
+		return errors.New("metro: ssh client cannot be nil")
+	}
+
 	listener, err := net.Listen("tcp", t.Local.String())
 	if err != nil {
 		return err
@@ -58,11 +66,21 @@ func (t *SSHtunnel) Start(client *ssh.Client, wait *sync.WaitGroup) error {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Println("Listener closed ")
 			return err
 		}
 		t.Active.Set(true)
 		go t.forward(conn, client)
+	}
+}
+
+// Stop closes the SSH tunnel
+func (t *SSHtunnel) Stop() {
+	t.listener.Close()
+	if t.Active.Get() {
+		// closing stopChan causes
+		// nil value  while channel is
+		// readed
+		close(t.stopChan)
 	}
 }
 
@@ -95,13 +113,6 @@ func copyConnection(conn1 net.Conn, conn2 net.Conn, stopChan chan bool) {
 			}
 			conn1.Write(b2)
 		}
-	}
-}
-
-func (t *SSHtunnel) Stop() {
-	t.listener.Close()
-	if t.Active.Get() {
-		close(t.stopChan)
 	}
 }
 
