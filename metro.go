@@ -13,6 +13,8 @@ import (
 
 	"time"
 
+	"sync"
+
 	"golang.org/x/crypto/ssh"
 )
 
@@ -87,6 +89,7 @@ func main() {
 		Host:   config.Host,
 		Port:   config.Port,
 		Config: cfg,
+		Wait:   &sync.WaitGroup{},
 	}
 
 	loadTunnelsFromFile(s, config.TunelList)
@@ -103,6 +106,7 @@ func main() {
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 	log.Println("Press Ctrl+C to close.")
 	<-signalChan
+	s.Stop()
 	log.Println("Bye bye")
 
 }

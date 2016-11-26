@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"strings"
+
+	"sync"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -31,24 +32,31 @@ func EndpointFromHostPort(hostPort string) (*Endpoint, error) {
 }
 
 type SSHtunnel struct {
-	Local  *Endpoint
-	Remote *Endpoint
-	Active bool
+	Local    *Endpoint
+	Remote   *Endpoint
+	Active   bool
+	stopChan chan bool
+	listener net.Listener
 }
 
-func (t *SSHtunnel) Start(client *ssh.Client) error {
+func (t *SSHtunnel) Start(client *ssh.Client, wait *sync.WaitGroup) error {
 	listener, err := net.Listen("tcp", t.Local.String())
 	if err != nil {
 		return err
 	}
-	t.Active = true
-	defer listener.Close()
+
+	wait.Add(1)
+	defer wait.Done()
+
+	t.listener = listener
 
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
+			log.Println("Listener closed ")
 			return err
 		}
+		t.Active = true
 		go t.forward(conn, client)
 	}
 }
@@ -60,14 +68,71 @@ func (t *SSHtunnel) forward(localConn net.Conn, client *ssh.Client) {
 		return
 	}
 
-	copyConn := func(writer, reader net.Conn) {
-		_, err := io.Copy(writer, reader)
-		if err != nil {
-			log.Printf("io.Copy error: %s", err)
+	copyConnection(localConn, remoteConn, t.stopChan)
+	closeConnections(localConn, remoteConn)
+}
+
+func copyConnection(conn1 net.Conn, conn2 net.Conn, stopChan chan bool) {
+	chan1 := chanFromConn(conn1)
+	chan2 := chanFromConn(conn2)
+	for {
+		select {
+		case <-stopChan:
+			return
+		case b1 := <-chan1:
+			if b1 == nil {
+				return
+			}
+			conn2.Write(b1)
+		case b2 := <-chan2:
+			if b2 == nil {
+				return
+			}
+			conn1.Write(b2)
+		}
+	}
+}
+
+func (t *SSHtunnel) Stop() {
+	t.listener.Close()
+	if t.Active {
+		close(t.stopChan)
+	}
+}
+
+// chanFromConn creates a channel from a Conn object, and sends everything it
+//  Read()s from the socket to the channel.
+func chanFromConn(conn net.Conn) chan []byte {
+	c := make(chan []byte)
+	go func() {
+		// If connection closed,
+		// EOR err is returned and channel closed
+		// Reading from closed channel returns nil
+		defer close(c)
+		buf1 := make([]byte, 32*1024)
+		buf2 := make([]byte, 32*1024)
+		for {
+			n, err := conn.Read(buf1)
+			if n > 0 {
+				copy(buf2, buf1[:n])
+				c <- buf2[:n]
+			}
+			if err != nil {
+				c <- nil
+				break
+			}
+		}
+	}()
+	return c
+}
+
+func closeConnections(connections ...net.Conn) {
+	log.Println("Closing connection")
+	for _, conn := range connections {
+		if err := conn.Close(); err != nil {
+			log.Println("Cannot close conn")
 		}
 	}
 
-	go copyConn(localConn, remoteConn)
-	go copyConn(remoteConn, localConn)
-
+	log.Println("Connection closed")
 }

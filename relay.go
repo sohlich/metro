@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"sync"
 
 	"github.com/pkg/errors"
 
@@ -18,6 +19,7 @@ type Relay struct {
 	Client  *ssh.Client
 	Tunnels []*SSHtunnel
 	Active  bool
+	Wait    *sync.WaitGroup
 }
 
 // AddTunnel adds a tunel configuration
@@ -37,12 +39,13 @@ func (s *Relay) AddTunnel(localPort, remoteHostPort string) error {
 	}
 
 	s.Tunnels = append(s.Tunnels, &SSHtunnel{
-		&Endpoint{
+		Local: &Endpoint{
 			"localhost",
 			localPort,
 		},
-		remote,
-		false,
+		Remote:   remote,
+		Active:   false,
+		stopChan: make(chan bool),
 	})
 	return nil
 }
@@ -58,15 +61,30 @@ func (s *Relay) PrintActiveTunels() {
 }
 
 func (s *Relay) Activate() error {
+	if s.Active {
+		return fmt.Errorf("Relay already activated")
+	}
 	if err := s.connect(); err != nil {
 		return errors.Wrap(err, "Cannot estabilish ssh connection")
 	}
 	for _, tunnel := range s.Tunnels {
-		go tunnel.Start(s.Client)
+		go tunnel.Start(s.Client, s.Wait)
 		tunnel.Active = true
 	}
 	s.Active = true
 	return nil
+}
+
+func (s *Relay) Stop() {
+	for _, tun := range s.Tunnels {
+		if tun.Active {
+			log.Println("Stop signal is being sent")
+			tun.Stop()
+		}
+	}
+
+	log.Println("Waiting to stop relay")
+	s.Wait.Wait()
 }
 
 func (s *Relay) connect() (err error) {
