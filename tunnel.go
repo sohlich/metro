@@ -84,42 +84,50 @@ func (t *SSHtunnel) Stop() {
 	}
 }
 
-func (t *SSHtunnel) forward(localConn net.Conn, client *ssh.Client) {
-	remoteConn, err := client.Dial("tcp", t.Remote.String())
+func (t *SSHtunnel) forward(local net.Conn, client *ssh.Client) {
+	remote, err := client.Dial("tcp", t.Remote.String())
 	if err != nil {
 		log.Printf("Remote dial error: %s\n", err)
 		return
 	}
 
-	copyConnection(localConn, remoteConn, t.stopChan)
-	closeConnections(localConn, remoteConn)
+	copyConnection(local, remote, t.stopChan)
+	closeConnections(local, remote)
 }
 
-func copyConnection(conn1 net.Conn, conn2 net.Conn, stopChan chan bool) {
-	chan1 := chanFromConn(conn1)
-	chan2 := chanFromConn(conn2)
+func copyConnection(local net.Conn, remote net.Conn, stopChan chan bool) {
+	localChan := chanFromConn(local)
+	remoteChan := chanFromConn(remote)
 	for {
 		select {
 		case <-stopChan:
 			return
-		case b1 := <-chan1:
+		case b1 := <-localChan:
 			if b1 == nil {
 				return
 			}
-			conn2.Write(b1)
-		case b2 := <-chan2:
+			remote.Write(b1.Data)
+		case b2 := <-remoteChan:
 			if b2 == nil {
 				return
 			}
-			conn1.Write(b2)
+			local.Write(b2.Data)
 		}
 	}
 }
 
+// Data wraps the content
+// and amount of data read from
+// connection
+type Data struct {
+	Size int
+	Data []byte
+}
+
 // chanFromConn creates a channel from a Conn object, and sends everything it
 //  Read()s from the socket to the channel.
-func chanFromConn(conn net.Conn) chan []byte {
-	c := make(chan []byte)
+func chanFromConn(conn net.Conn) chan *Data {
+	c := make(chan *Data)
 	go func() {
 		// If connection closed,
 		// EOR err is returned and channel closed
@@ -131,7 +139,7 @@ func chanFromConn(conn net.Conn) chan []byte {
 			n, err := conn.Read(buf1)
 			if n > 0 {
 				copy(buf2, buf1[:n])
-				c <- buf2[:n]
+				c <- &Data{n, buf2[:n]}
 			}
 			if err != nil {
 				c <- nil
@@ -143,12 +151,9 @@ func chanFromConn(conn net.Conn) chan []byte {
 }
 
 func closeConnections(connections ...net.Conn) {
-	log.Println("Closing connection")
 	for _, conn := range connections {
 		if err := conn.Close(); err != nil {
-			log.Println("Cannot close conn")
+			log.Println("Cannot close connection: %v\n", err)
 		}
 	}
-
-	log.Println("Connection closed")
 }
